@@ -80,6 +80,12 @@ export default function App() {
   const [highScore, setHighScore] = useState(0);
   const [difficulty, setDifficulty] = useState(1);
   const [difficultyLevel, setDifficultyLevel] = useState<DifficultyLevel>('NORMAL');
+
+  const updateDifficultyLevel = (level: DifficultyLevel) => {
+    setDifficultyLevel(level);
+    localStorage.setItem('neon-velocity-difficulty-level', level);
+  };
+
   const [isMobile, setIsMobile] = useState(false);
   const [carColor, setCarColor] = useState('#00FF00');
   const [spoilerType, setSpoilerType] = useState<SpoilerType>('NONE');
@@ -131,62 +137,13 @@ export default function App() {
   const audioCtx = useRef<AudioContext | null>(null);
 
   const playSound = (type: 'collect' | 'crash' | 'highscore' | 'engine') => {
-    if (!audioCtx.current) {
-      audioCtx.current = new (window.AudioContext || (window as any).webkitAudioContext)();
-    }
-    const ctx = audioCtx.current;
-    const osc = ctx.createOscillator();
-    const gain = ctx.createGain();
+    // User requested only the hit sound from the website
+    if (type !== 'crash') return;
 
-    osc.connect(gain);
-    gain.connect(ctx.destination);
-
-    const now = ctx.currentTime;
-
-    switch (type) {
-      case 'engine':
-        osc.type = engineSoundType === 'V8' ? 'sawtooth' : engineSoundType === 'TURBO' ? 'square' : 'sine';
-        const baseFreq = engineSoundType === 'V8' ? 60 : engineSoundType === 'TURBO' ? 120 : 200;
-        osc.frequency.setValueAtTime(baseFreq, now);
-        osc.frequency.exponentialRampToValueAtTime(baseFreq * 1.5, now + 0.1);
-        gain.gain.setValueAtTime(0.05, now);
-        gain.gain.exponentialRampToValueAtTime(0.01, now + 0.1);
-        osc.start(now);
-        osc.stop(now + 0.1);
-        break;
-      case 'collect':
-        osc.type = 'triangle';
-        osc.frequency.setValueAtTime(440, now);
-        osc.frequency.exponentialRampToValueAtTime(880, now + 0.1);
-        gain.gain.setValueAtTime(0.1, now);
-        gain.gain.exponentialRampToValueAtTime(0.01, now + 0.2);
-        osc.start(now);
-        osc.stop(now + 0.2);
-        break;
-      case 'crash':
-        osc.type = 'sawtooth';
-        osc.frequency.setValueAtTime(100, now);
-        osc.frequency.exponentialRampToValueAtTime(0.01, now + 0.5);
-        gain.gain.setValueAtTime(0.2, now);
-        gain.gain.exponentialRampToValueAtTime(0.01, now + 0.5);
-        osc.start(now);
-        osc.stop(now + 0.5);
-        break;
-      case 'highscore':
-        osc.type = 'square';
-        [523.25, 659.25, 783.99, 1046.50].forEach((freq, i) => {
-          const noteOsc = ctx.createOscillator();
-          const noteGain = ctx.createGain();
-          noteOsc.type = 'square';
-          noteOsc.frequency.setValueAtTime(freq, now + i * 0.1);
-          noteGain.connect(ctx.destination);
-          noteOsc.connect(noteGain);
-          noteGain.gain.setValueAtTime(0.1, now + i * 0.1);
-          noteGain.gain.exponentialRampToValueAtTime(0.01, now + i * 0.1 + 0.2);
-          noteOsc.start(now + i * 0.1);
-          noteOsc.stop(now + i * 0.1 + 0.2);
-        });
-        break;
+    const crashSound = document.getElementById('crash-sound') as HTMLAudioElement;
+    if (crashSound) {
+      crashSound.currentTime = 0;
+      crashSound.play().catch(() => {});
     }
   };
 
@@ -216,6 +173,9 @@ export default function App() {
 
     const savedUnlocked = localStorage.getItem('neon-velocity-unlocked');
     if (savedUnlocked) setUnlockedItems(JSON.parse(savedUnlocked));
+
+    const savedDifficulty = localStorage.getItem('neon-velocity-difficulty-level');
+    if (savedDifficulty) setDifficultyLevel(savedDifficulty as DifficultyLevel);
 
     const checkMobile = () => {
       setIsMobile('ontouchstart' in window || navigator.maxTouchPoints > 0);
@@ -262,16 +222,9 @@ export default function App() {
   const gameOver = useCallback(() => {
     setGameState('GAMEOVER');
     
-    const crashSound = document.getElementById('crash-sound') as HTMLAudioElement;
-    if (crashSound) {
-      crashSound.currentTime = 0;
-      crashSound.play().catch(() => {});
-    } else {
-      playSound('crash');
-    }
+    playSound('crash');
     
     if (score > highScore) {
-      playSound('highscore');
       setHighScore(score);
       localStorage.setItem('neon-velocity-highscore', score.toString());
     }
@@ -525,6 +478,7 @@ export default function App() {
 
         if (activeShield > 0) {
           setActiveShield(0);
+          playSound('crash');
           return false;
         } else {
           gameOver();
@@ -927,9 +881,24 @@ export default function App() {
               >
                 NEON VELOCITY
               </motion.h1>
-              <p className="text-zinc-400 mb-12 text-sm max-w-[250px] leading-relaxed">
+              <p className="text-zinc-400 mb-8 text-sm max-w-[250px] leading-relaxed">
                 Dodge the digital traffic in the grid.
               </p>
+
+              <div className="mb-10 w-full max-w-[280px]">
+                <label className="text-[10px] text-zinc-500 uppercase tracking-widest mb-3 block">Select Mode</label>
+                <div className="grid grid-cols-3 gap-2">
+                  {(['EASY', 'NORMAL', 'HARD'] as DifficultyLevel[]).map(level => (
+                    <button
+                      key={level}
+                      onClick={() => updateDifficultyLevel(level)}
+                      className={`py-2 text-[10px] font-bold uppercase tracking-widest border transition-all ${difficultyLevel === level ? 'bg-white text-black border-white' : 'bg-transparent text-zinc-500 border-zinc-800 hover:border-zinc-600'}`}
+                    >
+                      {level}
+                    </button>
+                  ))}
+                </div>
+              </div>
               
               <div className="flex flex-col gap-3">
                 <button
@@ -1093,7 +1062,7 @@ export default function App() {
                     {(['EASY', 'NORMAL', 'HARD'] as DifficultyLevel[]).map(level => (
                       <button
                         key={level}
-                        onClick={() => setDifficultyLevel(level)}
+                        onClick={() => updateDifficultyLevel(level)}
                         className={`py-2 text-[10px] font-bold uppercase tracking-widest border transition-all ${difficultyLevel === level ? 'bg-white text-black border-white' : 'bg-transparent text-zinc-500 border-zinc-800'}`}
                       >
                         {level}
@@ -1142,13 +1111,21 @@ export default function App() {
                 )}
               </div>
 
-              <button
-                onClick={startGame}
-                className="group relative px-10 py-5 bg-white text-black font-bold text-lg uppercase tracking-widest hover:bg-zinc-200 active:scale-95 transition-all"
-              >
-                <div className="absolute -inset-1 border border-white/50 group-hover:-inset-2 transition-all" />
-                Restart
-              </button>
+              <div className="flex flex-col gap-3">
+                <button
+                  onClick={startGame}
+                  className="group relative px-10 py-5 bg-white text-black font-bold text-lg uppercase tracking-widest hover:bg-zinc-200 active:scale-95 transition-all"
+                >
+                  <div className="absolute -inset-1 border border-white/50 group-hover:-inset-2 transition-all" />
+                  Restart
+                </button>
+                <button
+                  onClick={() => setGameState('SETTINGS')}
+                  className="px-10 py-3 bg-zinc-800 text-white font-bold text-sm uppercase tracking-widest hover:bg-zinc-700 transition-all"
+                >
+                  Settings
+                </button>
+              </div>
             </motion.div>
           )}
         </AnimatePresence>
