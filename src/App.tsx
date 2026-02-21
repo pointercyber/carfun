@@ -246,7 +246,9 @@ export default function App() {
       if (enemy.type === 'GRAVITY' && enemy.pull !== undefined) {
         // Check if player is within the gravity zone's Y range
         if (playerRef.current.y < enemy.y + enemy.height && playerRef.current.y + playerRef.current.height > enemy.y) {
-          playerRef.current.x += enemy.pull;
+          // Dynamic pull: varies over time
+          const timeFactor = 0.8 + Math.sin(time / 250) * 0.4;
+          playerRef.current.x += enemy.pull * timeFactor;
           playerRef.current.x = Math.max(0, Math.min(CANVAS_WIDTH - CAR_WIDTH, playerRef.current.x));
         }
       }
@@ -324,6 +326,7 @@ export default function App() {
         } else if (rand < 0.5 && difficulty > 1.4) {
           // Gravity Zone
           const pullDir = Math.random() > 0.5 ? 1 : -1;
+          const pullStrength = (3 + Math.random() * 3) * difficulty;
           enemiesRef.current.push({
             x: 0,
             y: -CAR_HEIGHT,
@@ -332,7 +335,7 @@ export default function App() {
             type: 'GRAVITY',
             color: 'rgba(100, 100, 255, 0.2)',
             speed: INITIAL_ENEMY_SPEED * difficulty * 0.6,
-            pull: pullDir * 4 * difficulty,
+            pull: pullDir * pullStrength,
           });
         } else if (rand < 0.6 && difficulty > 1.5) {
           // Holographic Platform
@@ -610,10 +613,24 @@ export default function App() {
           ctx.setLineDash([]);
         }
       } else if (enemy.type === 'GRAVITY') {
+        ctx.save();
         ctx.shadowBlur = 0;
         ctx.fillStyle = enemy.color;
         ctx.fillRect(enemy.x, enemy.y, enemy.width, enemy.height);
         
+        // Draw swirling vortex effect
+        const centerX = CANVAS_WIDTH / 2;
+        const centerY = enemy.y + enemy.height / 2;
+        ctx.strokeStyle = 'rgba(100, 100, 255, 0.4)';
+        ctx.lineWidth = 2;
+        for (let i = 0; i < 3; i++) {
+          ctx.beginPath();
+          const radius = 40 + i * 30;
+          const rotation = (time / 500) * (enemy.pull! > 0 ? 1 : -1) + i;
+          ctx.ellipse(centerX, centerY, radius * 2, radius / 2, rotation, 0, Math.PI * 2);
+          ctx.stroke();
+        }
+
         // Draw arrows indicating pull direction
         ctx.fillStyle = 'rgba(255, 255, 255, 0.3)';
         const arrowX = enemy.pull! > 0 ? CANVAS_WIDTH - 40 : 40;
@@ -628,6 +645,7 @@ export default function App() {
           ctx.lineTo(arrowX, enemy.y + enemy.height - 20);
         }
         ctx.fill();
+        ctx.restore();
       } else if (enemy.type === 'PLATFORM') {
         if (enemy.active) {
           ctx.shadowBlur = 15;
