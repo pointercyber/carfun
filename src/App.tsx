@@ -543,6 +543,17 @@ export default function App() {
       ctx.beginPath();
       ctx.arc(playerRef.current.x + playerRef.current.width / 2, playerRef.current.y + playerRef.current.height / 2, 45 + shimmer, 0, Math.PI * 2);
       ctx.fill();
+
+      // Rotating shimmering rings
+      ctx.strokeStyle = `rgba(168, 85, 247, ${0.3 + Math.sin(time / 150) * 0.2})`;
+      ctx.lineWidth = 2;
+      for (let i = 0; i < 2; i++) {
+        ctx.beginPath();
+        const radius = 40 + i * 10 + Math.sin(time / 200 + i) * 5;
+        const rotation = (time / 1000) * (i % 2 === 0 ? 1 : -1);
+        ctx.ellipse(playerRef.current.x + playerRef.current.width / 2, playerRef.current.y + playerRef.current.height / 2, radius * 1.2, radius, rotation, 0, Math.PI * 2);
+        ctx.stroke();
+      }
       ctx.restore();
     }
 
@@ -733,14 +744,50 @@ export default function App() {
       <div className="w-full max-w-[400px] flex justify-between items-center px-6 py-4 z-20">
         <div className="space-y-0.5">
           <div className="text-[10px] uppercase tracking-widest text-zinc-500">Score</div>
-          <div className="text-2xl font-display text-emerald-400 leading-none">
-            {score.toString().padStart(6, '0')}
-            {activeMultiplier > 0 && <span className="ml-2 text-xs text-purple-400">x2</span>}
+          <div className="flex items-center gap-3">
+            <div className="text-2xl font-display text-emerald-400 leading-none">
+              {score.toString().padStart(6, '0')}
+            </div>
+            {activeMultiplier > 0 && (
+              <div className="flex flex-col gap-0.5">
+                <span className="text-xs font-bold text-purple-400 leading-none">x2</span>
+                <div className="w-8 h-1 bg-zinc-800 rounded-full overflow-hidden">
+                  <motion.div 
+                    className="h-full bg-purple-500"
+                    initial={false}
+                    animate={{ width: `${(activeMultiplier / 400) * 100}%` }}
+                    transition={{ duration: 0.1 }}
+                  />
+                </div>
+              </div>
+            )}
           </div>
         </div>
-        <div className="flex gap-2">
-          {activeShield > 0 && <Shield size={16} className="text-blue-400 animate-pulse" />}
-          {activeBoost > 0 && <Zap size={16} className="text-amber-400 animate-bounce" />}
+        <div className="flex gap-4">
+          {activeShield > 0 && (
+            <div className="flex flex-col items-center gap-1">
+              <Shield size={16} className="text-blue-400 animate-pulse" />
+              <div className="w-6 h-0.5 bg-zinc-800 rounded-full overflow-hidden">
+                <motion.div 
+                  className="h-full bg-blue-500"
+                  animate={{ width: `${(activeShield / 300) * 100}%` }}
+                  transition={{ duration: 0.1 }}
+                />
+              </div>
+            </div>
+          )}
+          {activeBoost > 0 && (
+            <div className="flex flex-col items-center gap-1">
+              <Zap size={16} className="text-amber-400 animate-bounce" />
+              <div className="w-6 h-0.5 bg-zinc-800 rounded-full overflow-hidden">
+                <motion.div 
+                  className="h-full bg-amber-500"
+                  animate={{ width: `${(activeBoost / 200) * 100}%` }}
+                  transition={{ duration: 0.1 }}
+                />
+              </div>
+            </div>
+          )}
           {isSliding > 0 && <AlertTriangle size={16} className="text-zinc-400 animate-ping" />}
         </div>
         <div className="text-right space-y-0.5">
