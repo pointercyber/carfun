@@ -5,7 +5,7 @@
 
 import React, { useEffect, useRef, useState, useCallback } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { Trophy, Zap, Shield, AlertTriangle, ChevronLeft, ChevronRight } from 'lucide-react';
+import { Trophy, Zap, Shield, AlertTriangle, ChevronLeft, ChevronRight, Coins, Lock } from 'lucide-react';
 
 // --- Constants ---
 const CANVAS_WIDTH = 400;
@@ -17,7 +17,30 @@ const INITIAL_ENEMY_SPEED = 5;
 const ENEMY_SPAWN_RATE = 1500; // ms
 const ROAD_STRIPE_SPEED = 5;
 
-type PowerUpType = 'SHIELD' | 'BOOST' | 'MULTIPLIER';
+const UNLOCKABLES = {
+  COLORS: [
+    { id: 'green', color: '#00FF00', cost: 0 },
+    { id: 'blue', color: '#3b82f6', cost: 50 },
+    { id: 'red', color: '#ef4444', cost: 100 },
+    { id: 'purple', color: '#a855f7', cost: 150 },
+    { id: 'gold', color: '#f59e0b', cost: 500 },
+    { id: 'cyan', color: '#06b6d4', cost: 200 },
+    { id: 'pink', color: '#ec4899', cost: 250 },
+  ],
+  SPOILERS: [
+    { id: 'NONE' as SpoilerType, cost: 0 },
+    { id: 'SPORT' as SpoilerType, cost: 100 },
+    { id: 'WING' as SpoilerType, cost: 250 },
+    { id: 'GT' as SpoilerType, cost: 500 },
+  ],
+  TIRES: [
+    { id: 'STANDARD' as TireType, cost: 0 },
+    { id: 'GRIP' as TireType, cost: 200 },
+    { id: 'DRIFT' as TireType, cost: 200 },
+  ]
+};
+
+type PowerUpType = 'SHIELD' | 'BOOST' | 'MULTIPLIER' | 'COIN';
 type ObstacleType = 'CAR' | 'BARRIER' | 'OIL' | 'LASER' | 'GRAVITY' | 'PLATFORM';
 type SpoilerType = 'NONE' | 'SPORT' | 'WING' | 'GT';
 type TireType = 'STANDARD' | 'GRIP' | 'DRIFT';
@@ -66,6 +89,43 @@ export default function App() {
   const [activeMultiplier, setActiveMultiplier] = useState(0); // duration in frames
   const [activeBoost, setActiveBoost] = useState(0); // duration in frames
   const [isSliding, setIsSliding] = useState(0); // duration in frames
+  const [coins, setCoins] = useState(0);
+  const [unlockedItems, setUnlockedItems] = useState<{
+    colors: string[];
+    spoilers: SpoilerType[];
+    tires: TireType[];
+  }>({
+    colors: ['#00FF00'],
+    spoilers: ['NONE'],
+    tires: ['STANDARD'],
+  });
+
+  const buyItem = (type: 'color' | 'spoiler' | 'tire', id: string, cost: number) => {
+    const isUnlocked = 
+      type === 'color' ? unlockedItems.colors.includes(id) :
+      type === 'spoiler' ? unlockedItems.spoilers.includes(id as SpoilerType) :
+      unlockedItems.tires.includes(id as TireType);
+
+    if (isUnlocked) return true;
+
+    if (coins >= cost) {
+      setCoins(c => {
+        const newCoins = c - cost;
+        localStorage.setItem('neon-velocity-coins', newCoins.toString());
+        return newCoins;
+      });
+      setUnlockedItems(prev => {
+        const next = { ...prev };
+        if (type === 'color') next.colors = [...next.colors, id];
+        if (type === 'spoiler') next.spoilers = [...next.spoilers, id as SpoilerType];
+        if (type === 'tire') next.tires = [...next.tires, id as TireType];
+        localStorage.setItem('neon-velocity-unlocked', JSON.stringify(next));
+        return next;
+      });
+      return true;
+    }
+    return false;
+  };
 
   // --- Sound System ---
   const audioCtx = useRef<AudioContext | null>(null);
@@ -150,6 +210,12 @@ export default function App() {
   useEffect(() => {
     const savedHighScore = localStorage.getItem('neon-velocity-highscore');
     if (savedHighScore) setHighScore(parseInt(savedHighScore));
+
+    const savedCoins = localStorage.getItem('neon-velocity-coins');
+    if (savedCoins) setCoins(parseInt(savedCoins));
+
+    const savedUnlocked = localStorage.getItem('neon-velocity-unlocked');
+    if (savedUnlocked) setUnlockedItems(JSON.parse(savedUnlocked));
 
     const checkMobile = () => {
       setIsMobile('ontouchstart' in window || navigator.maxTouchPoints > 0);
@@ -274,7 +340,18 @@ export default function App() {
         spawnedX.push(x);
         
         const rand = Math.random();
-        if (i === 0 && rand < 0.1) {
+        if (rand < 0.15) {
+          // Coin
+          powerUpsRef.current.push({
+            x: x + (CAR_WIDTH - 25) / 2,
+            y: -CAR_HEIGHT,
+            width: 25,
+            height: 25,
+            type: 'COIN',
+            color: '#FFD700',
+            speed: INITIAL_ENEMY_SPEED * difficulty,
+          });
+        } else if (i === 0 && rand < 0.25) {
           // Power-up
           const types: PowerUpType[] = ['SHIELD', 'BOOST', 'MULTIPLIER'];
           const type = types[Math.floor(Math.random() * types.length)];
@@ -287,7 +364,7 @@ export default function App() {
             color: type === 'SHIELD' ? '#3b82f6' : type === 'BOOST' ? '#f59e0b' : '#a855f7',
             speed: INITIAL_ENEMY_SPEED * difficulty,
           });
-        } else if (rand < 0.2 && difficulty > 1.2) {
+        } else if (rand < 0.35 && difficulty > 1.2) {
           // Moving Barrier
           enemiesRef.current.push({
             x,
@@ -380,6 +457,13 @@ export default function App() {
         if (p.type === 'SHIELD') setActiveShield(300);
         if (p.type === 'BOOST') setActiveBoost(200);
         if (p.type === 'MULTIPLIER') setActiveMultiplier(400);
+        if (p.type === 'COIN') {
+          setCoins(c => {
+            const newCoins = c + 1;
+            localStorage.setItem('neon-velocity-coins', newCoins.toString());
+            return newCoins;
+          });
+        }
         return false;
       }
       return p.y <= CANVAS_HEIGHT;
@@ -496,19 +580,31 @@ export default function App() {
     ctx.lineDashOffset = -roadOffsetRef.current;
     ctx.stroke();
 
-    // Draw Power-ups
+    // Draw Power-ups & Coins
     powerUpsRef.current.forEach(p => {
       ctx.shadowBlur = 15;
       ctx.shadowColor = p.color;
       ctx.fillStyle = p.color;
-      ctx.beginPath();
-      ctx.arc(p.x + p.width / 2, p.y + p.height / 2, p.width / 2, 0, Math.PI * 2);
-      ctx.fill();
-      // Icon placeholder
-      ctx.fillStyle = '#fff';
-      ctx.font = 'bold 12px sans-serif';
-      ctx.textAlign = 'center';
-      ctx.fillText(p.type[0], p.x + p.width / 2, p.y + p.height / 2 + 4);
+      
+      if (p.type === 'COIN') {
+        // Spinning coin effect
+        const spin = Math.sin(time / 150);
+        ctx.beginPath();
+        ctx.ellipse(p.x + p.width / 2, p.y + p.height / 2, (p.width / 2) * Math.abs(spin), p.height / 2, 0, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.strokeStyle = '#fff';
+        ctx.lineWidth = 1;
+        ctx.stroke();
+      } else {
+        ctx.beginPath();
+        ctx.arc(p.x + p.width / 2, p.y + p.height / 2, p.width / 2, 0, Math.PI * 2);
+        ctx.fill();
+        // Icon placeholder
+        ctx.fillStyle = '#fff';
+        ctx.font = 'bold 12px sans-serif';
+        ctx.textAlign = 'center';
+        ctx.fillText(p.type[0], p.x + p.width / 2, p.y + p.height / 2 + 4);
+      }
     });
 
     // Draw Player Car (Neon Glow)
@@ -791,6 +887,13 @@ export default function App() {
           {isSliding > 0 && <AlertTriangle size={16} className="text-zinc-400 animate-ping" />}
         </div>
         <div className="text-right space-y-0.5">
+          <div className="text-[10px] uppercase tracking-widest text-zinc-500">Coins</div>
+          <div className="flex items-center justify-end gap-1 text-lg font-display text-amber-400 leading-none">
+            <Coins size={14} />
+            <span>{coins}</span>
+          </div>
+        </div>
+        <div className="text-right space-y-0.5">
           <div className="text-[10px] uppercase tracking-widest text-zinc-500">Best</div>
           <div className="text-lg font-display text-zinc-400 leading-none">{highScore.toString().padStart(6, '0')}</div>
         </div>
@@ -869,56 +972,104 @@ export default function App() {
               exit={{ opacity: 0, x: -20 }}
               className="absolute inset-0 bg-black/95 backdrop-blur-md flex flex-col p-8 z-40 overflow-y-auto"
             >
-              <h2 className="text-3xl font-display text-white mb-8 uppercase italic tracking-tighter">Configuration</h2>
+              <div className="flex justify-between items-center mb-8">
+                <h2 className="text-3xl font-display text-white uppercase italic tracking-tighter">Garage</h2>
+                <div className="flex items-center gap-2 px-3 py-1 bg-zinc-900 rounded-full border border-zinc-800">
+                  <Coins size={14} className="text-amber-400" />
+                  <span className="text-sm font-bold text-white">{coins}</span>
+                </div>
+              </div>
               
               <div className="space-y-8 text-left">
                 <section>
                   <label className="text-[10px] text-zinc-500 uppercase tracking-widest mb-3 block">Car Color</label>
-                  <div className="flex gap-3">
-                    {['#00FF00', '#3b82f6', '#f43f5e', '#a855f7', '#f59e0b'].map(color => (
-                      <button
-                        key={color}
-                        onClick={() => setCarColor(color)}
-                        className={`w-10 h-10 rounded-full border-2 transition-all ${carColor === color ? 'border-white scale-110 shadow-[0_0_15px_rgba(255,255,255,0.3)]' : 'border-transparent'}`}
-                        style={{ backgroundColor: color }}
-                      />
-                    ))}
+                  <div className="flex flex-wrap gap-3">
+                    {UNLOCKABLES.COLORS.map(item => {
+                      const isUnlocked = unlockedItems.colors.includes(item.color);
+                      const isSelected = carColor === item.color;
+                      return (
+                        <button
+                          key={item.id}
+                          onClick={() => {
+                            if (isUnlocked) setCarColor(item.color);
+                            else buyItem('color', item.color, item.cost);
+                          }}
+                          className={`relative w-10 h-10 rounded-full border-2 transition-all flex items-center justify-center ${isSelected ? 'border-white scale-110 shadow-[0_0_15px_rgba(255,255,255,0.3)]' : 'border-transparent'}`}
+                          style={{ backgroundColor: item.color }}
+                        >
+                          {!isUnlocked && (
+                            <div className="absolute inset-0 bg-black/40 rounded-full flex flex-col items-center justify-center">
+                              <Lock size={12} className="text-white" />
+                              <span className="text-[8px] font-bold text-white">{item.cost}</span>
+                            </div>
+                          )}
+                        </button>
+                      );
+                    })}
                   </div>
                 </section>
 
                 <section>
                   <label className="text-[10px] text-zinc-500 uppercase tracking-widest mb-3 block">Spoiler Design</label>
-                  <div className="grid grid-cols-4 gap-2">
-                    {(['NONE', 'SPORT', 'WING', 'GT'] as SpoilerType[]).map(type => (
-                      <button
-                        key={type}
-                        onClick={() => setSpoilerType(type)}
-                        className={`py-2 text-[10px] font-bold uppercase tracking-widest border transition-all ${spoilerType === type ? 'bg-white text-black border-white' : 'bg-transparent text-zinc-500 border-zinc-800'}`}
-                      >
-                        {type}
-                      </button>
-                    ))}
+                  <div className="grid grid-cols-2 gap-2">
+                    {UNLOCKABLES.SPOILERS.map(item => {
+                      const isUnlocked = unlockedItems.spoilers.includes(item.id);
+                      const isSelected = spoilerType === item.id;
+                      return (
+                        <button
+                          key={item.id}
+                          onClick={() => {
+                            if (isUnlocked) setSpoilerType(item.id);
+                            else buyItem('spoiler', item.id, item.cost);
+                          }}
+                          className={`group relative py-3 px-4 text-[10px] font-bold uppercase tracking-widest border transition-all flex justify-between items-center ${isSelected ? 'bg-white text-black border-white' : 'bg-transparent text-zinc-500 border-zinc-800'}`}
+                        >
+                          <span>{item.id}</span>
+                          {!isUnlocked && (
+                            <div className="flex items-center gap-1">
+                              <Lock size={10} />
+                              <span>{item.cost}</span>
+                            </div>
+                          )}
+                        </button>
+                      );
+                    })}
                   </div>
                 </section>
 
                 <section>
-                  <label className="text-[10px] text-zinc-500 uppercase tracking-widest mb-3 block">Tire Compound (Handling)</label>
-                  <div className="grid grid-cols-3 gap-2">
-                    {(['STANDARD', 'GRIP', 'DRIFT'] as TireType[]).map(type => (
-                      <button
-                        key={type}
-                        onClick={() => setTireType(type)}
-                        className={`py-2 text-[10px] font-bold uppercase tracking-widest border transition-all ${tireType === type ? 'bg-white text-black border-white' : 'bg-transparent text-zinc-500 border-zinc-800'}`}
-                      >
-                        {type}
-                      </button>
-                    ))}
+                  <label className="text-[10px] text-zinc-500 uppercase tracking-widest mb-3 block">Tire Compound</label>
+                  <div className="grid grid-cols-1 gap-2">
+                    {UNLOCKABLES.TIRES.map(item => {
+                      const isUnlocked = unlockedItems.tires.includes(item.id);
+                      const isSelected = tireType === item.id;
+                      return (
+                        <button
+                          key={item.id}
+                          onClick={() => {
+                            if (isUnlocked) setTireType(item.id);
+                            else buyItem('tire', item.id, item.cost);
+                          }}
+                          className={`group relative py-3 px-4 text-[10px] font-bold uppercase tracking-widest border transition-all flex justify-between items-center ${isSelected ? 'bg-white text-black border-white' : 'bg-transparent text-zinc-500 border-zinc-800'}`}
+                        >
+                          <div className="flex flex-col items-start">
+                            <span>{item.id}</span>
+                            <span className="text-[8px] opacity-60 font-normal normal-case italic">
+                              {item.id === 'STANDARD' && 'Balanced performance.'}
+                              {item.id === 'GRIP' && 'Better traction, faster steering.'}
+                              {item.id === 'DRIFT' && 'Extreme speed, high momentum.'}
+                            </span>
+                          </div>
+                          {!isUnlocked && (
+                            <div className="flex items-center gap-1">
+                              <Lock size={10} />
+                              <span>{item.cost}</span>
+                            </div>
+                          )}
+                        </button>
+                      );
+                    })}
                   </div>
-                  <p className="mt-2 text-[9px] text-zinc-600 italic">
-                    {tireType === 'STANDARD' && 'Balanced performance.'}
-                    {tireType === 'GRIP' && 'Better traction, faster steering.'}
-                    {tireType === 'DRIFT' && 'Extreme speed, high momentum.'}
-                  </p>
                 </section>
 
                 <section>
