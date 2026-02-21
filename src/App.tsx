@@ -257,20 +257,21 @@ export default function App() {
     // 2. Spawn Enemies & Power-ups
     const spawnInterval = (ENEMY_SPAWN_RATE / difficulty) * (activeBoost > 0 ? 0.5 : 1);
     if (time - lastSpawnTimeRef.current > spawnInterval) {
-      const laneWidth = CANVAS_WIDTH / 3;
-      const lanes = [0, 1, 2];
-      
-      // Shuffle lanes
-      for (let i = lanes.length - 1; i > 0; i--) {
-        const j = Math.floor(Math.random() * (i + 1));
-        [lanes[i], lanes[j]] = [lanes[j], lanes[i]];
-      }
-
       const spawnCount = difficulty > 1.5 && Math.random() > 0.5 ? 2 : 1;
+      const spawnedX: number[] = [];
       
       for (let i = 0; i < spawnCount; i++) {
-        const lane = lanes[i];
-        const x = lane * laneWidth + (laneWidth - CAR_WIDTH) / 2;
+        let x: number;
+        let attempts = 0;
+        // Try to find a non-overlapping X position
+        do {
+          x = Math.random() * (CANVAS_WIDTH - CAR_WIDTH);
+          attempts++;
+        } while (
+          spawnedX.some(sx => Math.abs(sx - x) < CAR_WIDTH + 20) && 
+          attempts < 10
+        );
+        spawnedX.push(x);
         
         const rand = Math.random();
         if (i === 0 && rand < 0.1) {
@@ -302,9 +303,9 @@ export default function App() {
         } else if (rand < 0.3 && difficulty > 1.1) {
           // Oil Slick
           enemiesRef.current.push({
-            x: lane * laneWidth + 10,
+            x: Math.max(10, Math.min(CANVAS_WIDTH - 110, x)),
             y: -CAR_HEIGHT,
-            width: laneWidth - 20,
+            width: 100,
             height: 50,
             type: 'OIL',
             color: 'rgba(50, 50, 50, 0.8)',
@@ -340,9 +341,9 @@ export default function App() {
         } else if (rand < 0.6 && difficulty > 1.5) {
           // Holographic Platform
           enemiesRef.current.push({
-            x: lane * laneWidth + 5,
+            x,
             y: -CAR_HEIGHT,
-            width: laneWidth - 10,
+            width: CAR_WIDTH * 1.5,
             height: 20,
             type: 'PLATFORM',
             color: '#00ffff',
