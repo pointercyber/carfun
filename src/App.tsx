@@ -17,7 +17,15 @@ const INITIAL_ENEMY_SPEED = 5;
 const ENEMY_SPAWN_RATE = 1500; // ms
 const ROAD_STRIPE_SPEED = 5;
 
-type GameState = 'START' | 'PLAYING' | 'GAMEOVER';
+type PowerUpType = 'SHIELD' | 'BOOST' | 'MULTIPLIER';
+
+interface PowerUp extends GameObject {
+  type: PowerUpType;
+  speed: number;
+}
+
+type GameState = 'START' | 'PLAYING' | 'GAMEOVER' | 'SETTINGS';
+type DifficultyLevel = 'EASY' | 'NORMAL' | 'HARD';
 
 interface GameObject {
   x: number;
@@ -38,7 +46,12 @@ export default function App() {
   const [score, setScore] = useState(0);
   const [highScore, setHighScore] = useState(0);
   const [difficulty, setDifficulty] = useState(1);
+  const [difficultyLevel, setDifficultyLevel] = useState<DifficultyLevel>('NORMAL');
   const [isMobile, setIsMobile] = useState(false);
+  const [carColor, setCarColor] = useState('#00FF00');
+  const [activeShield, setActiveShield] = useState(0); // duration in frames
+  const [activeMultiplier, setActiveMultiplier] = useState(0); // duration in frames
+  const [activeBoost, setActiveBoost] = useState(0); // duration in frames
 
   // Game Logic Refs
   const playerRef = useRef<GameObject>({
@@ -46,9 +59,10 @@ export default function App() {
     y: CANVAS_HEIGHT - CAR_HEIGHT - 40,
     width: CAR_WIDTH,
     height: CAR_HEIGHT,
-    color: '#00FF00', // Neon Green
+    color: '#00FF00',
   });
   const enemiesRef = useRef<Enemy[]>([]);
+  const powerUpsRef = useRef<PowerUp[]>([]);
   const keysRef = useRef<{ [key: string]: boolean }>({});
   const touchRef = useRef<{ left: boolean; right: boolean }>({ left: false, right: false });
   const requestRef = useRef<number>(null);
@@ -90,9 +104,14 @@ export default function App() {
   const startGame = () => {
     setGameState('PLAYING');
     setScore(0);
-    setDifficulty(1);
+    setDifficulty(difficultyLevel === 'EASY' ? 0.7 : difficultyLevel === 'HARD' ? 1.5 : 1);
     enemiesRef.current = [];
+    powerUpsRef.current = [];
+    setActiveShield(0);
+    setActiveMultiplier(0);
+    setActiveBoost(0);
     playerRef.current.x = CANVAS_WIDTH / 2 - CAR_WIDTH / 2;
+    playerRef.current.color = carColor;
     lastSpawnTimeRef.current = performance.now();
   };
 
@@ -119,6 +138,7 @@ export default function App() {
     if (!ctx) return;
 
     // 1. Move Player
+    const currentSpeed = PLAYER_SPEED * (activeBoost > 0 ? 1.5 : 1);
     const moveLeft = keysRef.current['ArrowLeft'] || keysRef.current['a'] || touchRef.current.left;
     const moveRight = keysRef.current['ArrowRight'] || keysRef.current['d'] || touchRef.current.right;
 
@@ -130,34 +150,78 @@ export default function App() {
       }
       
       if (moveLeft) {
-        playerRef.current.x = Math.max(0, playerRef.current.x - PLAYER_SPEED);
+        playerRef.current.x = Math.max(0, playerRef.current.x - currentSpeed);
       }
       if (moveRight) {
-        playerRef.current.x = Math.min(CANVAS_WIDTH - CAR_WIDTH, playerRef.current.x + PLAYER_SPEED);
+        playerRef.current.x = Math.min(CANVAS_WIDTH - CAR_WIDTH, playerRef.current.x + currentSpeed);
       }
     }
 
-    // 2. Spawn Enemies
-    const spawnInterval = ENEMY_SPAWN_RATE / difficulty;
+    // 2. Spawn Enemies & Power-ups
+    const spawnInterval = (ENEMY_SPAWN_RATE / difficulty) * (activeBoost > 0 ? 0.5 : 1);
     if (time - lastSpawnTimeRef.current > spawnInterval) {
       const laneWidth = CANVAS_WIDTH / 3;
-      const lane = Math.floor(Math.random() * 3);
-      const x = lane * laneWidth + (laneWidth - CAR_WIDTH) / 2;
+      const lanes = [0, 1, 2];
       
-      enemiesRef.current.push({
-        x,
-        y: -CAR_HEIGHT,
-        width: CAR_WIDTH,
-        height: CAR_HEIGHT,
-        color: `hsl(${Math.random() * 360}, 100%, 50%)`,
-        speed: INITIAL_ENEMY_SPEED * difficulty,
-      });
+      // Shuffle lanes
+      for (let i = lanes.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [lanes[i], lanes[j]] = [lanes[j], lanes[i]];
+      }
+
+      const spawnCount = difficulty > 1.5 && Math.random() > 0.5 ? 2 : 1;
+      
+      for (let i = 0; i < spawnCount; i++) {
+        const lane = lanes[i];
+        const x = lane * laneWidth + (laneWidth - CAR_WIDTH) / 2;
+        
+        // Randomly spawn power-up instead of enemy (10% chance)
+        if (i === 0 && Math.random() < 0.1) {
+          const types: PowerUpType[] = ['SHIELD', 'BOOST', 'MULTIPLIER'];
+          const type = types[Math.floor(Math.random() * types.length)];
+          powerUpsRef.current.push({
+            x,
+            y: -CAR_HEIGHT,
+            width: 30,
+            height: 30,
+            type,
+            color: type === 'SHIELD' ? '#3b82f6' : type === 'BOOST' ? '#f59e0b' : '#a855f7',
+            speed: INITIAL_ENEMY_SPEED * difficulty,
+          });
+        } else {
+          enemiesRef.current.push({
+            x,
+            y: -CAR_HEIGHT,
+            width: CAR_WIDTH,
+            height: CAR_HEIGHT,
+            color: `hsl(${Math.random() * 360}, 100%, 50%)`,
+            speed: INITIAL_ENEMY_SPEED * difficulty,
+          });
+        }
+      }
       lastSpawnTimeRef.current = time;
     }
 
-    // 3. Update Enemies & Collision
+    // 3. Update Power-ups
+    powerUpsRef.current = powerUpsRef.current.filter(p => {
+      p.y += p.speed;
+      if (
+        playerRef.current.x < p.x + p.width &&
+        playerRef.current.x + playerRef.current.width > p.x &&
+        playerRef.current.y < p.y + p.height &&
+        playerRef.current.y + playerRef.current.height > p.y
+      ) {
+        if (p.type === 'SHIELD') setActiveShield(300);
+        if (p.type === 'BOOST') setActiveBoost(200);
+        if (p.type === 'MULTIPLIER') setActiveMultiplier(400);
+        return false;
+      }
+      return p.y <= CANVAS_HEIGHT;
+    });
+
+    // 4. Update Enemies & Collision
     enemiesRef.current = enemiesRef.current.filter((enemy) => {
-      enemy.y += enemy.speed;
+      enemy.y += enemy.speed * (activeBoost > 0 ? 1.5 : 1);
 
       // Collision Detection
       if (
@@ -166,24 +230,35 @@ export default function App() {
         playerRef.current.y < enemy.y + enemy.height &&
         playerRef.current.y + playerRef.current.height > enemy.y
       ) {
-        gameOver();
+        if (activeShield > 0) {
+          setActiveShield(0);
+          return false;
+        } else {
+          gameOver();
+        }
       }
 
       // Score increment when passing enemy
       if (enemy.y > CANVAS_HEIGHT) {
-        setScore((s) => s + 10);
+        setScore((s) => s + (10 * (activeMultiplier > 0 ? 2 : 1)));
         return false;
       }
       return true;
     });
 
-    // 4. Update Difficulty
-    setDifficulty(1 + Math.floor(score / 200) * 0.1);
+    // 5. Update Active Power-up Timers
+    if (activeShield > 0) setActiveShield(s => s - 1);
+    if (activeMultiplier > 0) setActiveMultiplier(m => m - 1);
+    if (activeBoost > 0) setActiveBoost(b => b - 1);
 
-    // 5. Road Animation
-    roadOffsetRef.current = (roadOffsetRef.current + ROAD_STRIPE_SPEED * difficulty) % 100;
+    // 6. Update Difficulty
+    const baseDiff = difficultyLevel === 'EASY' ? 0.7 : difficultyLevel === 'HARD' ? 1.5 : 1;
+    setDifficulty(baseDiff + Math.floor(score / 200) * 0.1);
 
-    // 6. Draw
+    // 7. Road Animation
+    roadOffsetRef.current = (roadOffsetRef.current + ROAD_STRIPE_SPEED * difficulty * (activeBoost > 0 ? 2 : 1)) % 100;
+
+    // 8. Draw
     draw(ctx);
 
     requestRef.current = requestAnimationFrame(update);
@@ -209,11 +284,34 @@ export default function App() {
     ctx.lineDashOffset = -roadOffsetRef.current;
     ctx.stroke();
 
+    // Draw Power-ups
+    powerUpsRef.current.forEach(p => {
+      ctx.shadowBlur = 15;
+      ctx.shadowColor = p.color;
+      ctx.fillStyle = p.color;
+      ctx.beginPath();
+      ctx.arc(p.x + p.width / 2, p.y + p.height / 2, p.width / 2, 0, Math.PI * 2);
+      ctx.fill();
+      // Icon placeholder
+      ctx.fillStyle = '#fff';
+      ctx.font = 'bold 12px sans-serif';
+      ctx.textAlign = 'center';
+      ctx.fillText(p.type[0], p.x + p.width / 2, p.y + p.height / 2 + 4);
+    });
+
     // Draw Player Car (Neon Glow)
-    ctx.shadowBlur = 15;
-    ctx.shadowColor = playerRef.current.color;
+    ctx.shadowBlur = activeShield > 0 ? 30 : 15;
+    ctx.shadowColor = activeShield > 0 ? '#3b82f6' : playerRef.current.color;
     ctx.fillStyle = playerRef.current.color;
     drawCar(ctx, playerRef.current.x, playerRef.current.y, playerRef.current.width, playerRef.current.height);
+    
+    if (activeShield > 0) {
+      ctx.strokeStyle = '#3b82f6';
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.arc(playerRef.current.x + playerRef.current.width / 2, playerRef.current.y + playerRef.current.height / 2, 50, 0, Math.PI * 2);
+      ctx.stroke();
+    }
 
     // Draw Enemies
     enemiesRef.current.forEach((enemy) => {
@@ -263,7 +361,14 @@ export default function App() {
       <div className="w-full max-w-[400px] flex justify-between items-center px-6 py-4 z-20">
         <div className="space-y-0.5">
           <div className="text-[10px] uppercase tracking-widest text-zinc-500">Score</div>
-          <div className="text-2xl font-display text-emerald-400 leading-none">{score.toString().padStart(6, '0')}</div>
+          <div className="text-2xl font-display text-emerald-400 leading-none">
+            {score.toString().padStart(6, '0')}
+            {activeMultiplier > 0 && <span className="ml-2 text-xs text-purple-400">x2</span>}
+          </div>
+        </div>
+        <div className="flex gap-2">
+          {activeShield > 0 && <Shield size={16} className="text-blue-400 animate-pulse" />}
+          {activeBoost > 0 && <Zap size={16} className="text-amber-400 animate-bounce" />}
         </div>
         <div className="text-right space-y-0.5">
           <div className="text-[10px] uppercase tracking-widest text-zinc-500">Best</div>
@@ -303,13 +408,21 @@ export default function App() {
                 Dodge the digital traffic in the grid.
               </p>
               
-              <button
-                onClick={startGame}
-                className="group relative px-10 py-5 bg-emerald-500 text-black font-bold text-lg uppercase tracking-widest hover:bg-emerald-400 active:scale-95 transition-all"
-              >
-                <div className="absolute -inset-1 border border-emerald-500/50 group-hover:-inset-2 transition-all" />
-                Start Engine
-              </button>
+              <div className="flex flex-col gap-3">
+                <button
+                  onClick={startGame}
+                  className="group relative px-10 py-5 bg-emerald-500 text-black font-bold text-lg uppercase tracking-widest hover:bg-emerald-400 active:scale-95 transition-all"
+                >
+                  <div className="absolute -inset-1 border border-emerald-500/50 group-hover:-inset-2 transition-all" />
+                  Start Engine
+                </button>
+                <button
+                  onClick={() => setGameState('SETTINGS')}
+                  className="px-10 py-3 bg-zinc-800 text-white font-bold text-sm uppercase tracking-widest hover:bg-zinc-700 transition-all"
+                >
+                  Settings
+                </button>
+              </div>
               
               {!isMobile && (
                 <div className="mt-12 grid grid-cols-2 gap-8 text-[10px] text-zinc-500 uppercase tracking-widest">
@@ -326,6 +439,57 @@ export default function App() {
                   </div>
                 </div>
               )}
+            </motion.div>
+          )}
+
+          {gameState === 'SETTINGS' && (
+            <motion.div
+              initial={{ opacity: 0, x: 20 }}
+              animate={{ opacity: 1, x: 0 }}
+              exit={{ opacity: 0, x: -20 }}
+              className="absolute inset-0 bg-black/95 backdrop-blur-md flex flex-col p-8 z-40 overflow-y-auto"
+            >
+              <h2 className="text-3xl font-display text-white mb-8 uppercase italic tracking-tighter">Configuration</h2>
+              
+              <div className="space-y-8 text-left">
+                <section>
+                  <label className="text-[10px] text-zinc-500 uppercase tracking-widest mb-3 block">Car Color</label>
+                  <div className="flex gap-3">
+                    {['#00FF00', '#3b82f6', '#f43f5e', '#a855f7', '#f59e0b'].map(color => (
+                      <button
+                        key={color}
+                        onClick={() => setCarColor(color)}
+                        className={`w-10 h-10 rounded-full border-2 transition-all ${carColor === color ? 'border-white scale-110 shadow-[0_0_15px_rgba(255,255,255,0.3)]' : 'border-transparent'}`}
+                        style={{ backgroundColor: color }}
+                      />
+                    ))}
+                  </div>
+                </section>
+
+                <section>
+                  <label className="text-[10px] text-zinc-500 uppercase tracking-widest mb-3 block">Difficulty</label>
+                  <div className="grid grid-cols-3 gap-2">
+                    {(['EASY', 'NORMAL', 'HARD'] as DifficultyLevel[]).map(level => (
+                      <button
+                        key={level}
+                        onClick={() => setDifficultyLevel(level)}
+                        className={`py-2 text-[10px] font-bold uppercase tracking-widest border transition-all ${difficultyLevel === level ? 'bg-white text-black border-white' : 'bg-transparent text-zinc-500 border-zinc-800'}`}
+                      >
+                        {level}
+                      </button>
+                    ))}
+                  </div>
+                </section>
+
+                <section className="pt-4">
+                  <button
+                    onClick={() => setGameState('START')}
+                    className="w-full py-4 bg-emerald-500 text-black font-bold uppercase tracking-widest hover:bg-emerald-400 transition-all"
+                  >
+                    Save & Return
+                  </button>
+                </section>
+              </div>
             </motion.div>
           )}
 
