@@ -12,9 +12,9 @@ const CANVAS_WIDTH = 400;
 const CANVAS_HEIGHT = 600;
 const CAR_WIDTH = 40;
 const CAR_HEIGHT = 70;
-const PLAYER_SPEED = 7;
-const INITIAL_ENEMY_SPEED = 5;
-const ENEMY_SPAWN_RATE = 1500; // ms
+const PLAYER_SPEED = 10;
+const INITIAL_ENEMY_SPEED = 7;
+const ENEMY_SPAWN_RATE = 1200; // ms
 const ROAD_STRIPE_SPEED = 5;
 
 const UNLOCKABLES = {
@@ -340,7 +340,7 @@ export default function App() {
         spawnedX.push(x);
         
         const rand = Math.random();
-        if (rand < 0.15) {
+        if (rand < 0.4) {
           // Coin
           powerUpsRef.current.push({
             x: x + (CAR_WIDTH - 25) / 2,
@@ -548,8 +548,8 @@ export default function App() {
     if (isSliding > 0) setIsSliding(s => s - 1);
 
     // 6. Update Difficulty
-    const baseDiff = difficultyLevel === 'EASY' ? 0.7 : difficultyLevel === 'HARD' ? 1.5 : 1;
-    setDifficulty(baseDiff + Math.floor(score / 200) * 0.1);
+    const baseDiff = difficultyLevel === 'EASY' ? 1.2 : difficultyLevel === 'HARD' ? 3.0 : 2.0;
+    setDifficulty(baseDiff + Math.floor(score / 150) * 0.25);
 
     // 7. Road Animation
     roadOffsetRef.current = (roadOffsetRef.current + ROAD_STRIPE_SPEED * difficulty * (activeBoost > 0 ? 2 : 1)) % 100;
