@@ -53,6 +53,59 @@ export default function App() {
   const [activeMultiplier, setActiveMultiplier] = useState(0); // duration in frames
   const [activeBoost, setActiveBoost] = useState(0); // duration in frames
 
+  // --- Sound System ---
+  const audioCtx = useRef<AudioContext | null>(null);
+
+  const playSound = (type: 'collect' | 'crash' | 'highscore' | 'engine') => {
+    if (!audioCtx.current) {
+      audioCtx.current = new (window.AudioContext || (window as any).webkitAudioContext)();
+    }
+    const ctx = audioCtx.current;
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+
+    osc.connect(gain);
+    gain.connect(ctx.destination);
+
+    const now = ctx.currentTime;
+
+    switch (type) {
+      case 'collect':
+        osc.type = 'triangle';
+        osc.frequency.setValueAtTime(440, now);
+        osc.frequency.exponentialRampToValueAtTime(880, now + 0.1);
+        gain.gain.setValueAtTime(0.1, now);
+        gain.gain.exponentialRampToValueAtTime(0.01, now + 0.2);
+        osc.start(now);
+        osc.stop(now + 0.2);
+        break;
+      case 'crash':
+        osc.type = 'sawtooth';
+        osc.frequency.setValueAtTime(100, now);
+        osc.frequency.exponentialRampToValueAtTime(0.01, now + 0.5);
+        gain.gain.setValueAtTime(0.2, now);
+        gain.gain.exponentialRampToValueAtTime(0.01, now + 0.5);
+        osc.start(now);
+        osc.stop(now + 0.5);
+        break;
+      case 'highscore':
+        osc.type = 'square';
+        [523.25, 659.25, 783.99, 1046.50].forEach((freq, i) => {
+          const noteOsc = ctx.createOscillator();
+          const noteGain = ctx.createGain();
+          noteOsc.type = 'square';
+          noteOsc.frequency.setValueAtTime(freq, now + i * 0.1);
+          noteGain.connect(ctx.destination);
+          noteOsc.connect(noteGain);
+          noteGain.gain.setValueAtTime(0.1, now + i * 0.1);
+          noteGain.gain.exponentialRampToValueAtTime(0.01, now + i * 0.1 + 0.2);
+          noteOsc.start(now + i * 0.1);
+          noteOsc.stop(now + i * 0.1 + 0.2);
+        });
+        break;
+    }
+  };
+
   // Game Logic Refs
   const playerRef = useRef<GameObject>({
     x: CANVAS_WIDTH / 2 - CAR_WIDTH / 2,
@@ -117,12 +170,10 @@ export default function App() {
 
   const gameOver = useCallback(() => {
     setGameState('GAMEOVER');
-    const sound = document.getElementById('offline-sound-press') as HTMLAudioElement;
-    if (sound) {
-      sound.currentTime = 0;
-      sound.play().catch(() => {});
-    }
+    playSound('crash');
+    
     if (score > highScore) {
+      playSound('highscore');
       setHighScore(score);
       localStorage.setItem('neon-velocity-highscore', score.toString());
     }
@@ -211,6 +262,7 @@ export default function App() {
         playerRef.current.y < p.y + p.height &&
         playerRef.current.y + playerRef.current.height > p.y
       ) {
+        playSound('collect');
         if (p.type === 'SHIELD') setActiveShield(300);
         if (p.type === 'BOOST') setActiveBoost(200);
         if (p.type === 'MULTIPLIER') setActiveMultiplier(400);
