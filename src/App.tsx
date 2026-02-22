@@ -8,8 +8,8 @@ import { motion, AnimatePresence } from 'motion/react';
 import { Trophy, Zap, Shield, AlertTriangle, ChevronLeft, ChevronRight, Coins, Lock } from 'lucide-react';
 
 // --- Constants ---
-const CANVAS_WIDTH = 400;
-const CANVAS_HEIGHT = 600;
+const CANVAS_WIDTH = 600;
+const CANVAS_HEIGHT = 400;
 const CAR_WIDTH = 40;
 const CAR_HEIGHT = 70;
 const PLAYER_SPEED = 10;
@@ -590,10 +590,10 @@ export default function App() {
     ctx.strokeStyle = '#222';
     ctx.setLineDash([20, 20]);
     ctx.beginPath();
-    ctx.moveTo(CANVAS_WIDTH / 3, 0);
-    ctx.lineTo(CANVAS_WIDTH / 3, CANVAS_HEIGHT);
-    ctx.moveTo((CANVAS_WIDTH / 3) * 2, 0);
-    ctx.lineTo((CANVAS_WIDTH / 3) * 2, CANVAS_HEIGHT);
+    for (let i = 1; i <= 3; i++) {
+      ctx.moveTo((CANVAS_WIDTH / 4) * i, 0);
+      ctx.lineTo((CANVAS_WIDTH / 4) * i, CANVAS_HEIGHT);
+    }
     ctx.stroke();
 
     // Draw Moving Road Stripes
@@ -930,7 +930,7 @@ export default function App() {
       {/* Game Stage Container */}
       <div 
         ref={containerRef}
-        className="relative flex-1 w-full max-w-[400px] max-h-[600px] aspect-[2/3] border-x border-zinc-800/50 shadow-2xl z-10"
+        className="relative flex-1 w-full max-w-[600px] max-h-[400px] aspect-[3/2] border-x border-zinc-800/50 shadow-2xl z-10"
       >
         <canvas
           ref={canvasRef}
@@ -1276,7 +1276,7 @@ export default function App() {
       </div>
 
       {/* Footer Stats */}
-      <div className="w-full max-w-[400px] px-6 py-6 flex justify-between text-[10px] text-zinc-600 uppercase tracking-[0.2em] z-20">
+      <div className="w-full max-w-[600px] px-6 py-6 flex justify-between text-[10px] text-zinc-600 uppercase tracking-[0.2em] z-20">
         <div className="flex items-center gap-2">
           <Zap size={12} className="text-emerald-500" />
           <span>LVL {Math.floor(difficulty * 10) / 10}</span>
