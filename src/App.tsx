@@ -41,7 +41,7 @@ const UNLOCKABLES = {
 };
 
 type PowerUpType = 'SHIELD' | 'BOOST' | 'MULTIPLIER' | 'COIN';
-type ObstacleType = 'CAR' | 'BARRIER' | 'OIL' | 'LASER' | 'GRAVITY' | 'PLATFORM';
+type ObstacleType = 'CAR' | 'BARRIER' | 'OIL' | 'LASER' | 'GRAVITY' | 'PLATFORM' | 'CHASER';
 type SpoilerType = 'NONE' | 'SPORT' | 'WING' | 'GT';
 type TireType = 'STANDARD' | 'GRIP' | 'DRIFT';
 type EngineSoundType = 'V8' | 'TURBO' | 'ELECTRIC';
@@ -162,6 +162,7 @@ export default function App() {
   const requestRef = useRef<number>(null);
   const lastSpawnTimeRef = useRef<number>(0);
   const roadOffsetRef = useRef(0);
+  const lastCoinRewardTimeRef = useRef<number>(0);
 
   // --- Initialization ---
   useEffect(() => {
@@ -217,6 +218,7 @@ export default function App() {
     playerRef.current.x = CANVAS_WIDTH / 2 - CAR_WIDTH / 2;
     playerRef.current.color = carColor;
     lastSpawnTimeRef.current = performance.now();
+    lastCoinRewardTimeRef.current = performance.now();
   };
 
   const gameOver = useCallback(() => {
@@ -238,6 +240,16 @@ export default function App() {
 
     const ctx = canvasRef.current?.getContext('2d');
     if (!ctx) return;
+
+    // 0. Update Survival Coin Reward
+    if (time - lastCoinRewardTimeRef.current > 5000) { // Every 5 seconds
+      setCoins(c => {
+        const newCoins = c + 1;
+        localStorage.setItem('neon-velocity-coins', newCoins.toString());
+        return newCoins;
+      });
+      lastCoinRewardTimeRef.current = time;
+    }
 
     // 1. Move Player
     const basePlayerSpeed = tireType === 'GRIP' ? 9 : tireType === 'DRIFT' ? 11 : 7;
@@ -381,6 +393,18 @@ export default function App() {
             timer: 0,
             active: true,
           });
+        } else if (rand < 0.7 && difficulty > 1.6) {
+          // Chaser Car
+          enemiesRef.current.push({
+            x,
+            y: -CAR_HEIGHT,
+            width: CAR_WIDTH,
+            height: CAR_HEIGHT,
+            type: 'CHASER',
+            color: '#ff4400',
+            speed: INITIAL_ENEMY_SPEED * difficulty * 1.1,
+            vx: 0,
+          });
         } else {
           // Standard Car
           enemiesRef.current.push({
@@ -452,6 +476,13 @@ export default function App() {
         }
       }
 
+      // Chaser Logic
+      if (enemy.type === 'CHASER') {
+        const dx = playerRef.current.x - enemy.x;
+        const chaseSpeed = 1.5 * difficulty;
+        enemy.x += Math.sign(dx) * Math.min(Math.abs(dx), chaseSpeed);
+      }
+
       // Collision Detection
       if (
         playerRef.current.x < enemy.x + enemy.width &&
@@ -502,8 +533,8 @@ export default function App() {
     if (isSliding > 0) setIsSliding(s => s - 1);
 
     // 6. Update Difficulty
-    const baseDiff = difficultyLevel === 'EASY' ? 1.2 : difficultyLevel === 'HARD' ? 3.0 : 2.0;
-    setDifficulty(baseDiff + Math.floor(score / 150) * 0.25);
+    const baseDiff = difficultyLevel === 'EASY' ? 1.2 : difficultyLevel === 'HARD' ? 3.5 : 2.5;
+    setDifficulty(baseDiff + Math.floor(score / 100) * 0.35);
 
     // 7. Road Animation
     roadOffsetRef.current = (roadOffsetRef.current + ROAD_STRIPE_SPEED * difficulty * (activeBoost > 0 ? 2 : 1)) % 100;
@@ -722,6 +753,13 @@ export default function App() {
           ctx.fillStyle = 'rgba(0, 255, 255, 0.1)';
           ctx.fillRect(enemy.x, enemy.y, enemy.width, enemy.height);
         }
+      } else if (enemy.type === 'CHASER') {
+        ctx.shadowBlur = 20;
+        ctx.shadowColor = '#ff4400';
+        drawCar(ctx, enemy.x, enemy.y, enemy.width, enemy.height, false);
+        // Add some aggressive detail
+        ctx.fillStyle = '#ff0000';
+        ctx.fillRect(enemy.x + 10, enemy.y + 10, enemy.width - 20, 5);
       } else {
         drawCar(ctx, enemy.x, enemy.y, enemy.width, enemy.height, false);
       }
