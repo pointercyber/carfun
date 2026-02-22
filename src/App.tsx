@@ -53,10 +53,10 @@ interface PowerUp extends GameObject {
 
 type GameState = 'START' | 'PLAYING' | 'GAMEOVER' | 'SETTINGS';
 type DifficultyLevel = 'EASY' | 'NORMAL' | 'HARD';
-type SoundMode = 'GOPI' | 'RETRO' | 'MODERN';
+type SoundMode = 'GOPI HIM' | 'RETRO' | 'MODERN' | 'CYBER' | 'PHONK';
 
 const SOUND_MODES = {
-  GOPI: {
+  'GOPI HIM': {
     crash: 'https://rad-pie-250f2f.netlify.app/sounds/s1.mp3',
     move: 'https://rad-pie-250f2f.netlify.app/sounds/old.mp3'
   },
@@ -65,6 +65,14 @@ const SOUND_MODES = {
     move: 'https://rad-pie-250f2f.netlify.app/sounds/old.mp3'
   },
   MODERN: {
+    crash: 'https://rad-pie-250f2f.netlify.app/sounds/s1.mp3',
+    move: 'https://rad-pie-250f2f.netlify.app/sounds/old.mp3'
+  },
+  CYBER: {
+    crash: 'https://rad-pie-250f2f.netlify.app/sounds/s1.mp3',
+    move: 'https://rad-pie-250f2f.netlify.app/sounds/old.mp3'
+  },
+  PHONK: {
     crash: 'https://rad-pie-250f2f.netlify.app/sounds/s1.mp3',
     move: 'https://rad-pie-250f2f.netlify.app/sounds/old.mp3'
   }
@@ -96,7 +104,7 @@ export default function App() {
   const [highScore, setHighScore] = useState(0);
   const [difficulty, setDifficulty] = useState(1);
   const [difficultyLevel, setDifficultyLevel] = useState<DifficultyLevel>('NORMAL');
-  const [soundMode, setSoundMode] = useState<SoundMode>('GOPI');
+  const [soundMode, setSoundMode] = useState<SoundMode>('GOPI HIM');
   const [showSoundOptions, setShowSoundOptions] = useState(false);
 
   const updateDifficultyLevel = (level: DifficultyLevel) => {
@@ -940,19 +948,6 @@ export default function App() {
               exit={{ opacity: 0 }}
               className="absolute inset-0 bg-black/90 backdrop-blur-sm flex flex-col items-center justify-center p-8 text-center z-30"
             >
-              <motion.div
-                initial={{ y: -20, opacity: 0 }}
-                animate={{ y: 0, opacity: 1 }}
-                transition={{ delay: 0.2 }}
-                className="mb-6"
-              >
-                <img 
-                  src="https://rad-pie-250f2f.netlify.app/images/sura.jpg" 
-                  alt="Sura Title" 
-                  className="w-48 h-auto rounded-lg shadow-2xl border border-white/20"
-                  referrerPolicy="no-referrer"
-                />
-              </motion.div>
               <motion.h1 
                 initial={{ scale: 0.8, y: 20 }}
                 animate={{ scale: 1, y: 0 }}
@@ -999,7 +994,7 @@ export default function App() {
                       <div>
                         <label className="text-[8px] text-zinc-600 uppercase tracking-widest mb-2 block">Voice Mode</label>
                         <div className="grid grid-cols-3 gap-2">
-                          {(['GOPI', 'RETRO', 'MODERN'] as SoundMode[]).map(mode => (
+                          {(['GOPI HIM', 'RETRO', 'MODERN', 'CYBER', 'PHONK'] as SoundMode[]).map(mode => (
                             <button
                               key={mode}
                               onClick={() => setSoundMode(mode)}
@@ -1012,10 +1007,12 @@ export default function App() {
                       </div>
 
                       <div>
-                        <label className="text-[8px] text-zinc-600 uppercase tracking-widest mb-2 block">Other Sounds</label>
-                        <div className="grid grid-cols-2 gap-2 opacity-50">
-                          <div className="py-1.5 text-[9px] text-zinc-600 border border-dashed border-zinc-800 uppercase tracking-widest">Coming Soon</div>
-                          <div className="py-1.5 text-[9px] text-zinc-600 border border-dashed border-zinc-800 uppercase tracking-widest">Coming Soon</div>
+                        <label className="text-[8px] text-zinc-600 uppercase tracking-widest mb-2 block">Ambient Samples</label>
+                        <div className="grid grid-cols-2 gap-2">
+                          <button className="py-1.5 text-[9px] text-zinc-500 border border-zinc-800 uppercase tracking-widest hover:border-zinc-600 transition-all">City Rain</button>
+                          <button className="py-1.5 text-[9px] text-zinc-500 border border-zinc-800 uppercase tracking-widest hover:border-zinc-600 transition-all">Cyber Hum</button>
+                          <button className="py-1.5 text-[9px] text-zinc-500 border border-zinc-800 uppercase tracking-widest hover:border-zinc-600 transition-all">Static</button>
+                          <button className="py-1.5 text-[9px] text-zinc-500 border border-zinc-800 uppercase tracking-widest hover:border-zinc-600 transition-all">Neon Pulse</button>
                         </div>
                       </div>
                     </motion.div>
